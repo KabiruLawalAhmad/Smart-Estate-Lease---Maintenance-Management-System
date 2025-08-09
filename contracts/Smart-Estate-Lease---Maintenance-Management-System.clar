@@ -7,6 +7,9 @@
 (define-constant err-insufficient-balance (err u105))
 (define-constant err-voting-closed (err u106))
 (define-constant err-already-voted (err u107))
+(define-constant err-transfer-pending (err u108))
+(define-constant err-transfer-not-found (err u109))
+(define-constant err-transfer-expired (err u110))
 
 (define-non-fungible-token lease-nft uint)
 (define-fungible-token estate-token)
@@ -87,6 +90,30 @@
 )
 
 (define-data-var next-expense-id uint u1)
+(define-data-var next-transfer-id uint u1)
+
+(define-map lease-transfers
+  uint
+  {
+    lease-id: uint,
+    current-tenant: principal,
+    new-tenant: principal,
+    transfer-fee: uint,
+    expires-at: uint,
+    status: (string-ascii 20),
+    created-at: uint
+  }
+)
+
+(define-map transfer-history
+  { lease-id: uint, transfer-id: uint }
+  {
+    from-tenant: principal,
+    to-tenant: principal,
+    transfer-fee: uint,
+    completed-at: uint
+  }
+)
 
 (define-read-only (get-lease (lease-id uint))
   (map-get? leases lease-id)
@@ -102,6 +129,14 @@
 
 (define-read-only (get-expense-log (expense-id uint))
   (map-get? expense-logs expense-id)
+)
+
+(define-read-only (get-lease-transfer (transfer-id uint))
+  (map-get? lease-transfers transfer-id)
+)
+
+(define-read-only (get-transfer-history (lease-id uint) (transfer-id uint))
+  (map-get? transfer-history { lease-id: lease-id, transfer-id: transfer-id })
 )
 
 (define-read-only (calculate-late-fee (lease-id uint))
@@ -289,6 +324,71 @@
         true
       )
     )
+    (ok true)
+  )
+)
+
+(define-public (initiate-lease-transfer 
+  (lease-id uint)
+  (new-tenant principal)
+  (transfer-fee uint)
+  (expiry-duration uint)
+)
+  (let ((lease-data (unwrap! (get-lease lease-id) err-not-found))
+        (transfer-id (var-get next-transfer-id)))
+    (asserts! (is-eq tx-sender (get tenant lease-data)) err-unauthorized)
+    (asserts! (get is-active lease-data) err-lease-active)
+    (map-set lease-transfers transfer-id {
+      lease-id: lease-id,
+      current-tenant: tx-sender,
+      new-tenant: new-tenant,
+      transfer-fee: transfer-fee,
+      expires-at: (+ stacks-block-height expiry-duration),
+      status: "pending",
+      created-at: stacks-block-height
+    })
+    (var-set next-transfer-id (+ transfer-id u1))
+    (ok transfer-id)
+  )
+)
+
+(define-public (approve-lease-transfer (transfer-id uint))
+  (let ((transfer-data (unwrap! (get-lease-transfer transfer-id) err-transfer-not-found))
+        (lease-data (unwrap! (get-lease (get lease-id transfer-data)) err-not-found)))
+    (asserts! (is-eq tx-sender (get landlord lease-data)) err-unauthorized)
+    (asserts! (is-eq (get status transfer-data) "pending") err-unauthorized)
+    (asserts! (<= stacks-block-height (get expires-at transfer-data)) err-transfer-expired)
+    (map-set lease-transfers transfer-id (merge transfer-data { status: "approved" }))
+    (ok true)
+  )
+)
+
+(define-public (execute-lease-transfer (transfer-id uint))
+  (let ((transfer-data (unwrap! (get-lease-transfer transfer-id) err-transfer-not-found))
+        (lease-data (unwrap! (get-lease (get lease-id transfer-data)) err-not-found)))
+    (asserts! (is-eq tx-sender (get new-tenant transfer-data)) err-unauthorized)
+    (asserts! (is-eq (get status transfer-data) "approved") err-unauthorized)
+    (asserts! (<= stacks-block-height (get expires-at transfer-data)) err-transfer-expired)
+    (try! (stx-transfer? (get transfer-fee transfer-data) tx-sender (get current-tenant transfer-data)))
+    (try! (nft-transfer? lease-nft (get lease-id transfer-data) (get current-tenant transfer-data) tx-sender))
+    (map-set leases (get lease-id transfer-data) (merge lease-data { tenant: tx-sender }))
+    (map-set lease-transfers transfer-id (merge transfer-data { status: "completed" }))
+    (map-set transfer-history { lease-id: (get lease-id transfer-data), transfer-id: transfer-id } {
+      from-tenant: (get current-tenant transfer-data),
+      to-tenant: tx-sender,
+      transfer-fee: (get transfer-fee transfer-data),
+      completed-at: stacks-block-height
+    })
+    (unwrap-panic (log-expense (get lease-id transfer-data) (get transfer-fee transfer-data) "Lease Transfer Fee" "transfer"))
+    (ok true)
+  )
+)
+
+(define-public (cancel-lease-transfer (transfer-id uint))
+  (let ((transfer-data (unwrap! (get-lease-transfer transfer-id) err-transfer-not-found)))
+    (asserts! (is-eq tx-sender (get current-tenant transfer-data)) err-unauthorized)
+    (asserts! (is-eq (get status transfer-data) "pending") err-unauthorized)
+    (map-set lease-transfers transfer-id (merge transfer-data { status: "cancelled" }))
     (ok true)
   )
 )
