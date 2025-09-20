@@ -392,3 +392,48 @@
     (ok true)
   )
 )
+
+(define-data-var next-extension-id uint u1)
+
+(define-map extension-requests
+  uint
+  {
+    lease-id: uint,
+    requested-duration: uint,
+    status: (string-ascii 20),
+    requested-by: principal,
+    approved-by: (optional principal)
+  }
+)
+
+(define-read-only (get-extension-request (request-id uint))
+  (map-get? extension-requests request-id)
+)
+
+(define-public (request-lease-extension (lease-id uint) (additional-duration uint))
+  (let ((lease-data (unwrap! (get-lease lease-id) err-not-found))
+        (request-id (var-get next-extension-id)))
+    (asserts! (is-eq tx-sender (get tenant lease-data)) err-unauthorized)
+    (asserts! (get is-active lease-data) err-lease-active)
+    (map-set extension-requests request-id {
+      lease-id: lease-id,
+      requested-duration: additional-duration,
+      status: "pending",
+      requested-by: tx-sender,
+      approved-by: none
+    })
+    (var-set next-extension-id (+ request-id u1))
+    (ok request-id)
+  )
+)
+
+(define-public (approve-lease-extension (request-id uint))
+  (let ((request-data (unwrap! (get-extension-request request-id) err-not-found))
+        (lease-data (unwrap! (get-lease (get lease-id request-data)) err-not-found)))
+    (asserts! (is-eq tx-sender (get landlord lease-data)) err-unauthorized)
+    (asserts! (is-eq (get status request-data) "pending") err-unauthorized)
+    (map-set extension-requests request-id (merge request-data { status: "approved", approved-by: (some tx-sender) }))
+    (map-set leases (get lease-id request-data) (merge lease-data { lease-end: (+ (get lease-end lease-data) (get requested-duration request-data)) }))
+    (ok true)
+  )
+)
