@@ -11,6 +11,7 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 - Monthly rent payments with automatic late fee calculation
 - Transparent payment history on blockchain
 - Built-in late fee triggers based on configurable rates
+- Rent escrow system for pre-funded rent payments
 
 ### 🔒 Token Staking for Maintenance Deposits
 - Estate tokens for security deposits
@@ -32,6 +33,8 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 ### Lease Management
 - `create-lease` - Create new lease with NFT minting
 - `pay-rent` - Process monthly rent payments
+- `deposit-rent-escrow` - Pre-fund rent payments in escrow
+- `withdraw-rent-escrow` - Use escrowed funds for rent payment
 - `terminate-lease` - End lease and return deposits
 
 ### Maintenance System
@@ -78,9 +81,19 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 ### For Tenants
 
 1. **Pay monthly rent:**
-   ```clarity
-   (contract-call? .smart-estate pay-rent u1)
-   ```
+    ```clarity
+    (contract-call? .smart-estate pay-rent u1)
+    ```
+
+2. **Deposit rent escrow:**
+    ```clarity
+    (contract-call? .smart-estate deposit-rent-escrow u1 u2000)
+    ```
+
+3. **Withdraw from rent escrow:**
+    ```clarity
+    (contract-call? .smart-estate withdraw-rent-escrow u1)
+    ```
 
 2. **Submit maintenance request:**
    ```clarity
@@ -138,6 +151,11 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 - Voting mechanism with time limits
 - Automatic execution for approved proposals
 
+### Rent Escrow
+- Pre-funded rent payment system
+- Automatic withdrawal for monthly payments
+- Secure escrow management with contract control
+
 ## 🔧 Development Setup
 
 1. Install Clarinet
@@ -152,6 +170,7 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 - **🤝 Trust:** Smart contracts eliminate need for intermediaries
 - **📈 Efficiency:** Streamlined rent collection and maintenance
 - **🏛️ Democracy:** Tenant participation in estate improvements
+- **💸 Convenience:** Rent escrow eliminates monthly payment friction
 
 ## 🔐 Security Features
 
@@ -160,6 +179,7 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 - Secure token staking mechanisms
 - Time-locked voting periods
 - Immutable expense logging
+- Protected rent escrow with contract-controlled withdrawals
 
 ---
 

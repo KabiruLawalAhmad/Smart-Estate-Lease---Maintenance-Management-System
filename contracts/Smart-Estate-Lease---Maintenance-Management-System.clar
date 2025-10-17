@@ -10,6 +10,8 @@
 (define-constant err-transfer-pending (err u108))
 (define-constant err-transfer-not-found (err u109))
 (define-constant err-transfer-expired (err u110))
+(define-constant err-escrow-insufficient (err u111))
+(define-constant err-escrow-empty (err u112))
 
 (define-non-fungible-token lease-nft uint)
 (define-fungible-token estate-token)
@@ -115,6 +117,17 @@
   }
 )
 
+(define-map rent-escrows
+  uint
+  {
+    lease-id: uint,
+    tenant: principal,
+    amount: uint,
+    deposited-at: uint,
+    is-active: bool
+  }
+)
+
 (define-read-only (get-lease (lease-id uint))
   (map-get? leases lease-id)
 )
@@ -137,6 +150,10 @@
 
 (define-read-only (get-transfer-history (lease-id uint) (transfer-id uint))
   (map-get? transfer-history { lease-id: lease-id, transfer-id: transfer-id })
+)
+
+(define-read-only (get-rent-escrow (escrow-id uint))
+  (map-get? rent-escrows escrow-id)
 )
 
 (define-read-only (calculate-late-fee (lease-id uint))
@@ -190,6 +207,41 @@
       (unwrap-panic (log-expense lease-id total-amount "Monthly Rent Payment" "rent"))
       (ok total-amount)
     )
+  )
+)
+
+(define-public (deposit-rent-escrow (lease-id uint) (amount uint))
+  (let ((lease-data (unwrap! (get-lease lease-id) err-not-found))
+        (escrow-id (var-get next-expense-id)))
+    (asserts! (is-eq tx-sender (get tenant lease-data)) err-unauthorized)
+    (asserts! (get is-active lease-data) err-lease-active)
+    (try! (stx-transfer? amount tx-sender (as-contract tx-sender)))
+    (map-set rent-escrows escrow-id {
+      lease-id: lease-id,
+      tenant: tx-sender,
+      amount: amount,
+      deposited-at: stacks-block-height,
+      is-active: true
+    })
+    (var-set next-expense-id (+ escrow-id u1))
+    (ok escrow-id)
+  )
+)
+
+(define-public (withdraw-rent-escrow (escrow-id uint))
+  (let ((escrow-data (unwrap! (get-rent-escrow escrow-id) err-not-found))
+        (lease-data (unwrap! (get-lease (get lease-id escrow-data)) err-not-found)))
+    (asserts! (is-eq tx-sender (get tenant escrow-data)) err-unauthorized)
+    (asserts! (get is-active escrow-data) err-escrow-empty)
+    (asserts! (>= (get amount escrow-data) (get monthly-rent lease-data)) err-escrow-insufficient)
+    (try! (as-contract (stx-transfer? (get monthly-rent lease-data) tx-sender (get landlord lease-data))))
+    (map-set rent-escrows escrow-id (merge escrow-data {
+      amount: (- (get amount escrow-data) (get monthly-rent lease-data)),
+      is-active: (> (- (get amount escrow-data) (get monthly-rent lease-data)) u0)
+    }))
+    (map-set leases (get lease-id escrow-data) (merge lease-data { last-payment: stacks-block-height }))
+    (unwrap-panic (log-expense (get lease-id escrow-data) (get monthly-rent lease-data) "Escrow Rent Payment" "rent"))
+    (ok (get monthly-rent lease-data))
   )
 )
 
