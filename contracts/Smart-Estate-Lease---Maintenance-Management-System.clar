@@ -12,6 +12,7 @@
 (define-constant err-transfer-expired (err u110))
 (define-constant err-escrow-insufficient (err u111))
 (define-constant err-escrow-empty (err u112))
+(define-constant err-dispute-not-found (err u113))
 
 (define-non-fungible-token lease-nft uint)
 (define-fungible-token estate-token)
@@ -446,6 +447,7 @@
 )
 
 (define-data-var next-extension-id uint u1)
+(define-data-var next-dispute-id uint u1)
 
 (define-map extension-requests
   uint
@@ -458,8 +460,25 @@
   }
 )
 
+(define-map lease-disputes
+  uint
+  {
+    lease-id: uint,
+    raised-by: principal,
+    description: (string-ascii 500),
+    status: (string-ascii 20),
+    raised-at: uint,
+    resolved-at: (optional uint),
+    resolution: (optional (string-ascii 500))
+  }
+)
+
 (define-read-only (get-extension-request (request-id uint))
   (map-get? extension-requests request-id)
+)
+
+(define-read-only (get-lease-dispute (dispute-id uint))
+  (map-get? lease-disputes dispute-id)
 )
 
 (define-public (request-lease-extension (lease-id uint) (additional-duration uint))
@@ -486,6 +505,39 @@
     (asserts! (is-eq (get status request-data) "pending") err-unauthorized)
     (map-set extension-requests request-id (merge request-data { status: "approved", approved-by: (some tx-sender) }))
     (map-set leases (get lease-id request-data) (merge lease-data { lease-end: (+ (get lease-end lease-data) (get requested-duration request-data)) }))
+    (ok true)
+  )
+)
+
+(define-public (raise-lease-dispute (lease-id uint) (description (string-ascii 500)))
+  (let ((lease-data (unwrap! (get-lease lease-id) err-not-found))
+        (dispute-id (var-get next-dispute-id)))
+    (asserts! (or (is-eq tx-sender (get tenant lease-data)) (is-eq tx-sender (get landlord lease-data))) err-unauthorized)
+    (asserts! (get is-active lease-data) err-lease-active)
+    (map-set lease-disputes dispute-id {
+      lease-id: lease-id,
+      raised-by: tx-sender,
+      description: description,
+      status: "open",
+      raised-at: stacks-block-height,
+      resolved-at: none,
+      resolution: none
+    })
+    (var-set next-dispute-id (+ dispute-id u1))
+    (ok dispute-id)
+  )
+)
+
+(define-public (resolve-lease-dispute (dispute-id uint) (resolution (string-ascii 500)))
+  (let ((dispute-data (unwrap! (get-lease-dispute dispute-id) err-dispute-not-found))
+        (lease-data (unwrap! (get-lease (get lease-id dispute-data)) err-not-found)))
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (asserts! (is-eq (get status dispute-data) "open") err-unauthorized)
+    (map-set lease-disputes dispute-id (merge dispute-data {
+      status: "resolved",
+      resolved-at: (some stacks-block-height),
+      resolution: (some resolution)
+    }))
     (ok true)
   )
 )

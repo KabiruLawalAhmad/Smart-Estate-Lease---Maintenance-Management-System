@@ -36,6 +36,8 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 - `deposit-rent-escrow` - Pre-fund rent payments in escrow
 - `withdraw-rent-escrow` - Use escrowed funds for rent payment
 - `terminate-lease` - End lease and return deposits
+- `raise-lease-dispute` - Raise disputes for lease-related issues
+- `resolve-lease-dispute` - Contract owner resolves disputes
 
 ### Maintenance System
 - `submit-maintenance-request` - Tenants request repairs
@@ -156,6 +158,12 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 - Automatic withdrawal for monthly payments
 - Secure escrow management with contract control
 
+### Lease Disputes
+- Transparent dispute resolution mechanism
+- Disputes can be raised by tenants or landlords
+- Contract owner resolves disputes with documented outcomes
+- Immutable dispute history for accountability
+
 ## 🔧 Development Setup
 
 1. Install Clarinet
@@ -180,6 +188,7 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 - Time-locked voting periods
 - Immutable expense logging
 - Protected rent escrow with contract-controlled withdrawals
+- Dispute resolution system with transparent outcomes
 
 ---
 
