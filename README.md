@@ -13,6 +13,11 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 - Built-in late fee triggers based on configurable rates
 - Rent escrow system for pre-funded rent payments
 
+### ⭐ Lease Rating System
+- Post-lease rating mechanism for tenants and landlords
+- Builds reputation scores to enhance trust and decision-making
+- Transparent feedback with ratings from 1-5 and optional comments
+
 ### 🔒 Token Staking for Maintenance Deposits
 - Estate tokens for security deposits
 - Automated deposit return upon lease termination
@@ -38,6 +43,8 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 - `terminate-lease` - End lease and return deposits
 - `raise-lease-dispute` - Raise disputes for lease-related issues
 - `resolve-lease-dispute` - Contract owner resolves disputes
+- `submit-lease-rating` - Submit ratings after lease termination
+- `get-lease-rating` - Retrieve rating details
 
 ### Maintenance System
 - `submit-maintenance-request` - Tenants request repairs
@@ -164,6 +171,11 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 - Contract owner resolves disputes with documented outcomes
 - Immutable dispute history for accountability
 
+### Lease Ratings
+- Post-lease feedback system for reputation building
+- Ratings from 1-5 with optional comments
+- Immutable rating history for transparency and accountability
+
 ## 🔧 Development Setup
 
 1. Install Clarinet
@@ -179,6 +191,7 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 - **📈 Efficiency:** Streamlined rent collection and maintenance
 - **🏛️ Democracy:** Tenant participation in estate improvements
 - **💸 Convenience:** Rent escrow eliminates monthly payment friction
+- **⭐ Reputation:** Rating system fosters accountability and informed decisions
 
 ## 🔐 Security Features
 
@@ -189,6 +202,7 @@ A blockchain-based estate management platform that revolutionizes how landlords 
 - Immutable expense logging
 - Protected rent escrow with contract-controlled withdrawals
 - Dispute resolution system with transparent outcomes
+- Rating validation with bounds checking and post-lease restrictions
 
 ---
 

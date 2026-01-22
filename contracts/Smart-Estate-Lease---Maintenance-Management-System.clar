@@ -448,6 +448,7 @@
 
 (define-data-var next-extension-id uint u1)
 (define-data-var next-dispute-id uint u1)
+(define-data-var next-rating-id uint u1)
 
 (define-map extension-requests
   uint
@@ -473,12 +474,28 @@
   }
 )
 
+(define-map lease-ratings
+  uint
+  {
+    lease-id: uint,
+    rated-by: principal,
+    rated-user: principal,
+    rating: uint,
+    comment: (string-ascii 200),
+    submitted-at: uint
+  }
+)
+
 (define-read-only (get-extension-request (request-id uint))
   (map-get? extension-requests request-id)
 )
 
 (define-read-only (get-lease-dispute (dispute-id uint))
   (map-get? lease-disputes dispute-id)
+)
+
+(define-read-only (get-lease-rating (rating-id uint))
+  (map-get? lease-ratings rating-id)
 )
 
 (define-public (request-lease-extension (lease-id uint) (additional-duration uint))
@@ -539,5 +556,25 @@
       resolution: (some resolution)
     }))
     (ok true)
+  )
+)
+
+(define-public (submit-lease-rating (lease-id uint) (rated-user principal) (rating uint) (comment (string-ascii 200)))
+  (let ((lease-data (unwrap! (get-lease lease-id) err-not-found))
+        (rating-id (var-get next-rating-id)))
+    (asserts! (not (get is-active lease-data)) err-lease-active)
+    (asserts! (or (is-eq tx-sender (get tenant lease-data)) (is-eq tx-sender (get landlord lease-data))) err-unauthorized)
+    (asserts! (is-eq rated-user (if (is-eq tx-sender (get tenant lease-data)) (get landlord lease-data) (get tenant lease-data))) err-unauthorized)
+    (asserts! (and (>= rating u1) (<= rating u5)) err-invalid-amount)
+    (map-set lease-ratings rating-id {
+      lease-id: lease-id,
+      rated-by: tx-sender,
+      rated-user: rated-user,
+      rating: rating,
+      comment: comment,
+      submitted-at: stacks-block-height
+    })
+    (var-set next-rating-id (+ rating-id u1))
+    (ok rating-id)
   )
 )
